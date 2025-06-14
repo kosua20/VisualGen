@@ -109,7 +109,7 @@ int main(int argc, char** argv){
 
 	// Parameters
 	const fs::path inputDirPath = fs::path(argv[1]);
-	const std::string projectName = argv[2];
+	const std::string projectName = fs::path(argv[2]).filename().replace_extension("").string();
 	const std::string compileExtensionsList = argc > 3 ? argv[3] : "";
 	const std::string includeExtensionsList = argc > 4 ? argv[4] : "";
 	const std::string projectUUID = "0000-0000-0000-0000";
