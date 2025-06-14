@@ -22,7 +22,7 @@
 // * additional prefix/suffix strings for the vcxproj (and vcxproj.filters?)
 // --------------------------------------------------------------------------------
 
-constexpr std::string helpStr = "visualgen local/path/to/dir ProjectName \"cpp,c\" \"h,hpp\"";
+const std::string helpStr = "visualgen local/path/to/dir ProjectName \"cpp,c\" \"h,hpp\"";
 
 // --------------------------------------------------------------------------------
 //	String and path utilities
@@ -112,9 +112,12 @@ int main(int argc, char** argv){
 	const std::string projectName = argv[2];
 	const std::string compileExtensionsList = argc > 3 ? argv[3] : "";
 	const std::string includeExtensionsList = argc > 4 ? argv[4] : "";
-	const fs::path outputVcxprojPath = inputDirPath / (projectName + ".vcxproj");
-	const fs::path outputFilterPath = inputDirPath / (projectName + ".vcxproj.filters");
-	const std::string projectUUID = projectName;
+	const std::string projectUUID = "0000-0000-0000-0000";
+
+	fs::path outputVcxprojPath = inputDirPath / projectName;
+	fs::path outputFilterPath = inputDirPath / projectName;
+	outputVcxprojPath.replace_extension(".vcxproj");
+	outputFilterPath.replace_extension(".vcxproj.filters");
 
 	const std::unordered_set<std::string> compileExtensions = extractExtensions(compileExtensionsList);
 	const std::unordered_set<std::string> includeExtensions = extractExtensions(includeExtensionsList);
