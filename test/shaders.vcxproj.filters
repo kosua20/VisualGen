@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+<ItemGroup>
+	<Filter Include="cg">
+	</Filter>
+	<Filter Include="cg\include">
+	</Filter>
+	<Filter Include="cg\include2">
+	</Filter>
+	<Filter Include="cg\include2\def_a">
+	</Filter>
+	<Filter Include="cg\include2\def_a\def_b">
+	</Filter>
+	<Filter Include="cg\include\def">
+	</Filter>
+	<Filter Include="fx">
+	</Filter>
+	<Filter Include="fx\subfx">
+	</Filter>
+</ItemGroup>
+
+<ItemGroup>
+	<ClInclude Include="cg/shader1.cg">
+		<Filter>cg</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/include/def/def2.cg">
+		<Filter>cg\include\def</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/include/def/def1.cg">
+		<Filter>cg\include\def</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/include/common2.inl">
+		<Filter>cg\include</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/include/helpers.cg">
+		<Filter>cg\include</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/include/common.cg">
+		<Filter>cg\include</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/include2/def_a/def_b/def_b3.inl">
+		<Filter>cg\include2\def_a\def_b</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/include2/def_a/def_b/def_b1.cg">
+		<Filter>cg\include2\def_a\def_b</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/include2/def_a/def_b/def_b2.cg">
+		<Filter>cg\include2\def_a\def_b</Filter>
+	</ClInclude>
+	<ClInclude Include="cg/shader2.cg">
+		<Filter>cg</Filter>
+	</ClInclude>
+</ItemGroup>
+
+<ItemGroup>
+	<ClCompile Include="fx/effect2.fx">
+		<Filter>fx</Filter>
+	</ClCompile>
+	<ClCompile Include="fx/subfx/common.fx">
+		<Filter>fx\subfx</Filter>
+	</ClCompile>
+	<ClCompile Include="fx/effect3.fx">
+		<Filter>fx</Filter>
+	</ClCompile>
+	<ClCompile Include="fx/effect1.fx">
+		<Filter>fx</Filter>
+	</ClCompile>
+</ItemGroup>
+
+</Project>

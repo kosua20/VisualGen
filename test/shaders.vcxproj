@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+<PropertyGroup Label="Globals">
+	<ProjectGuid>shaders</ProjectGuid>
+	<RootNamespace>shaders</RootNamespace>
+</PropertyGroup>
+
+<ItemGroup>
+	<ClInclude Include="cg/shader1.cg" />
+	<ClInclude Include="cg/include/def/def2.cg" />
+	<ClInclude Include="cg/include/def/def1.cg" />
+	<ClInclude Include="cg/include/common2.inl" />
+	<ClInclude Include="cg/include/helpers.cg" />
+	<ClInclude Include="cg/include/common.cg" />
+	<ClInclude Include="cg/include2/def_a/def_b/def_b3.inl" />
+	<ClInclude Include="cg/include2/def_a/def_b/def_b1.cg" />
+	<ClInclude Include="cg/include2/def_a/def_b/def_b2.cg" />
+	<ClInclude Include="cg/shader2.cg" />
+</ItemGroup>
+
+<ItemGroup>
+	<ClCompile Include="fx/effect2.fx" />
+	<ClCompile Include="fx/subfx/common.fx" />
+	<ClCompile Include="fx/effect3.fx" />
+	<ClCompile Include="fx/effect1.fx" />
+</ItemGroup>
+
+</Project>
