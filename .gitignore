@@ -1,2 +1,7 @@
 /build/
 /VisualGen
+.vs/
+/x64/
+/ext/
+*.vcxproj.user
+*.args.json
