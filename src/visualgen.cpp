@@ -18,11 +18,11 @@
 // Simon Rodriguez, June 2025
 // --------------------------------------------------------------------------------
 // TODO:
-// * GUID for the project?
-// * additional prefix/suffix strings for the vcxproj (and vcxproj.filters?)
+// * update a vcxproj/vcxproj.filters in place by removing all ItemGroups that contain ClCompile/ClInclude/FXCompile/Text/None items.
+// 	 That way we won't have to handle the SLN generation nor the UUID update, and can remove the header/footer arguments.
 // --------------------------------------------------------------------------------
 
-const std::string helpStr = "visualgen local/path/to/dir ProjectName \"cpp,c\" \"h,hpp\"";
+const std::string helpStr = "visualgen local/path/to/dir ProjectName \"header\" \"footer\" \"cpp,c\" \"h,hpp\" \"excluded,paths\"";
 
 // --------------------------------------------------------------------------------
 //	String and path utilities
@@ -65,18 +65,32 @@ std::vector<std::string> split(const std::string & str, const std::string & deli
 	return tokens;
 }
 
-std::unordered_set<std::string> extractExtensions(const std::string& extensionList){
-	std::vector<std::string> extensions = split(trim(extensionList, "\""), ",", true);
-
+std::unordered_set<std::string> extractItems( const std::string& itemsList )
+{
+	std::vector<std::string> items = split( trim( itemsList, "\"" ), ",", true );
 	std::unordered_set<std::string> result;
-	for(const std::string& extension : extensions){
-		std::string extensionCleaned = trim(extension, ". ");
-		if(extensionCleaned.empty())
+	for( const std::string& item : items )
+	{
+		std::string itemCleaned = trim( item, " " );
+		if( itemCleaned.empty() )
 			continue;
-		result.insert("." + extensionCleaned);
+		result.insert( itemCleaned );
 	}
 	return result;
 }
+
+std::unordered_set<std::string> extractExtensions(const std::string& extensionList){
+	std::unordered_set<std::string> rawExtensions = extractItems( extensionList );
+	std::unordered_set<std::string> extensions;
+	for(const std::string& rawExtension : rawExtensions ){
+		std::string extensionCleaned = trim( rawExtension, ". ");
+		if(extensionCleaned.empty())
+			continue;
+		extensions.insert("." + extensionCleaned);
+	}
+	return extensions;
+}
+
 
 void collectDirectoriesAlongPath(const fs::path& path, std::unordered_set<std::string>& directories){
 	fs::path currentPath = path;
@@ -102,7 +116,7 @@ void collectDirectoriesAlongPath(const fs::path& path, std::unordered_set<std::s
 
 int main(int argc, char** argv){
 
-	if(argc < 3 || argc > 5){
+	if(argc < 5 || argc > 8){
 		std::cout << helpStr << std::endl;
 		return 0;
 	}
@@ -110,9 +124,11 @@ int main(int argc, char** argv){
 	// Parameters
 	const fs::path inputDirPath = fs::path(argv[1]);
 	const std::string projectName = fs::path(argv[2]).filename().replace_extension("").string();
-	const std::string compileExtensionsList = argc > 3 ? argv[3] : "";
-	const std::string includeExtensionsList = argc > 4 ? argv[4] : "";
-	const std::string projectUUID = "0000-0000-0000-0000";
+	const std::string header = std::string( argv[ 3] );
+	const std::string footer = std::string( argv[ 4 ] );
+	const std::string compileExtensionsList = argc > 5 ? argv[5] : "";
+	const std::string includeExtensionsList = argc > 6 ? argv[6] : "";
+	const std::string excludedDirs = argc > 7 ? argv[7] : "";
 
 	fs::path outputVcxprojPath = inputDirPath / projectName;
 	fs::path outputFilterPath = inputDirPath / projectName;
@@ -123,19 +139,26 @@ int main(int argc, char** argv){
 	const std::unordered_set<std::string> includeExtensions = extractExtensions(includeExtensionsList);
 	const bool noExtensionFilter = compileExtensions.empty() && includeExtensions.empty();
 
+	const std::unordered_set<std::string> excludedRootDirs = extractItems( excludedDirs );
+
 	std::cout << "Processing " << inputDirPath.string() << " to " << outputVcxprojPath.string() << std::endl;
 
-	
 	// Collect file paths and directories
 	std::vector<fs::path> compileFilePaths;
 	std::vector<fs::path> includeFilePaths;
 	std::unordered_set<std::string> directoryPaths;
 
-	for(const auto& entry : fs::recursive_directory_iterator(inputDirPath)){
+	fs::recursive_directory_iterator filesIterator( inputDirPath );
+	for(const auto& entry : filesIterator ){
+
+		const fs::path entryPath = relative( entry.path(), inputDirPath );
 		if(!entry.is_regular_file()){
+			// Skip directory if it is among the excluded sub-root directories.
+			if( excludedRootDirs.count( entryPath.string() ) != 0 ){
+				filesIterator.disable_recursion_pending();
+			}
 			continue;
 		}
-		const fs::path entryPath = relative(entry.path(), inputDirPath);
 		const fs::path filename = entryPath.filename();
 		const std::string entryName = filename.string();
 		// Skip hidden
@@ -147,11 +170,11 @@ int main(int argc, char** argv){
 			continue;
 		}
 		// If no filter, assume everything is compiled.
-		if(noExtensionFilter || (compileExtensions.count(filename.extension()) != 0)){
+		if(noExtensionFilter || (compileExtensions.count(filename.extension().string()) != 0)){
 			compileFilePaths.emplace_back(entryPath);
 			collectDirectoriesAlongPath(entryPath, directoryPaths);
 		}
-		if(includeExtensions.count(filename.extension()) != 0){
+		if(includeExtensions.count(filename.extension().string()) != 0){
 			includeFilePaths.emplace_back(entryPath);
 			collectDirectoriesAlongPath(entryPath, directoryPaths);
 		}
@@ -173,14 +196,9 @@ int main(int argc, char** argv){
 		}
 
 		vcxproj << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
-		vcxproj << "<Project DefaultTargets=\"Build\" ToolsVersion=\"4\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n";
+		vcxproj << "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n";
 		vcxproj << "\n";
-
-		vcxproj << "<PropertyGroup Label=\"Globals\">\n";
-		vcxproj << "\t<ProjectGuid>" << projectUUID << "</ProjectGuid>\n";
-		vcxproj << "\t<RootNamespace>" << projectName << "</RootNamespace>\n";
-		vcxproj << "</PropertyGroup>\n";
-		vcxproj << "\n";
+		vcxproj << header << "\n";
 
 		if(!includeFilePaths.empty()){
 			vcxproj << "<ItemGroup>\n";
@@ -202,6 +220,7 @@ int main(int argc, char** argv){
 
 		}
 
+		vcxproj << footer << "\n";
 		vcxproj << "</Project>\n";
 
 		vcxproj.close();
