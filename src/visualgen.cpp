@@ -5,7 +5,7 @@
 #include <unordered_set>
 #include <sstream>
 
-#if 0
+#if 1
 	#include <filesystem>
 	namespace fs = std::filesystem;
 #else
@@ -22,7 +22,7 @@
 // 	 That way we won't have to handle the SLN generation nor the UUID update, and can remove the header/footer arguments.
 // --------------------------------------------------------------------------------
 
-const std::string helpStr = "visualgen local/path/to/dir ProjectName \"header\" \"footer\" \"cpp,c\" \"h,hpp\" \"excluded,paths\"";
+const std::string helpStr = "visualgen path/to/vcxproj local/path/to/dir \"cpp,c\" \"h,hpp\" \"excluded,paths\"";
 
 // --------------------------------------------------------------------------------
 //	String and path utilities
@@ -116,22 +116,22 @@ void collectDirectoriesAlongPath(const fs::path& path, std::unordered_set<std::s
 
 int main(int argc, char** argv){
 
-	if(argc < 5 || argc > 8){
+	if(argc < 3 || argc > 6){
 		std::cout << helpStr << std::endl;
 		return 0;
 	}
 
 	// Parameters
-	const fs::path inputDirPath = fs::path(argv[1]);
-	const std::string projectName = fs::path(argv[2]).filename().replace_extension("").string();
-	const std::string header = std::string( argv[ 3] );
-	const std::string footer = std::string( argv[ 4 ] );
-	const std::string compileExtensionsList = argc > 5 ? argv[5] : "";
-	const std::string includeExtensionsList = argc > 6 ? argv[6] : "";
-	const std::string excludedDirs = argc > 7 ? argv[7] : "";
+	const fs::path projectPath = fs::path(argv[ 1 ]);
+	const fs::path inputDirPath = fs::path(argv[ 2 ]);
+	
+	const std::string compileExtensionsList = argc > 3 ? argv[3] : "";
+	const std::string includeExtensionsList = argc > 4 ? argv[4] : "";
+	const std::string excludedDirs = argc > 5 ? argv[5] : "";
 
-	fs::path outputVcxprojPath = inputDirPath / projectName;
-	fs::path outputFilterPath = inputDirPath / projectName;
+	const std::string projectName = projectPath.stem().string();
+	fs::path outputVcxprojPath = projectPath;
+	fs::path outputFilterPath = outputVcxprojPath;
 	outputVcxprojPath.replace_extension(".vcxproj");
 	outputFilterPath.replace_extension(".vcxproj.filters");
 
@@ -187,6 +187,84 @@ int main(int argc, char** argv){
 	std::sort(compileFilePaths.begin(), compileFilePaths.end());
 	std::sort(includeFilePaths.begin(), includeFilePaths.end());
 
+
+	std::string vcxprojHeader; 
+	vcxprojHeader.append( "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" );
+	vcxprojHeader.append( "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n\n" );
+
+	std::string vcxprojFooter;
+	vcxprojFooter.append( "\n<PropertyGroup Label=\"Globals\">\n" );
+	vcxprojFooter.append( "\t<RootNamespace>" + projectName + "</RootNamespace>\n" );
+	vcxprojFooter.append( "</PropertyGroup>\n\n" );
+	vcxprojFooter.append( "</Project>\n" );
+
+	// Open existing .vcxproj
+	{
+		std::ifstream vcxprojRef( projectPath );
+		if( vcxprojRef.is_open() )
+		{
+			std::string fullContent;
+			std::string line;
+			while( std::getline( vcxprojRef, line ) )
+			{
+				fullContent.append( line );
+				fullContent.append( "\n" );
+			}
+			vcxprojRef.close();
+
+			const std::string startToken = "<ItemGroup>";
+			const std::string endToken = "</ItemGroup>";
+			std::vector<std::pair<size_t, size_t>> groupRanges;
+			std::string::size_type currentPos = 0;
+			while( currentPos < fullContent.size() )
+			{
+				std::string::size_type nextGroupStart = fullContent.find( startToken, currentPos );
+				if( nextGroupStart == std::string::npos )
+					break;
+				std::string::size_type nextGroupEnd = fullContent.find( endToken, nextGroupStart );
+				if( nextGroupEnd == std::string::npos )
+					break;
+
+				currentPos = nextGroupEnd + endToken.size();
+				groupRanges.emplace_back( ( size_t)nextGroupStart, ( size_t )currentPos);
+			}
+			// If no group found, artificially insert one just before the end
+			if( groupRanges.empty() )
+			{
+				std::string::size_type projectEnd = fullContent.find( "</Project>");
+				if( (projectEnd != std::string::npos) && (projectEnd > 0))
+				{
+					groupRanges.emplace_back( ( size_t)(projectEnd), ( size_t)projectEnd );
+				}
+			}
+			
+			if( !groupRanges.empty() )
+			{
+				vcxprojHeader = fullContent.substr( 0, groupRanges[ 0 ].first );
+				vcxprojFooter = "";
+				unsigned int i = 1;
+				for(; i < groupRanges.size(); ++i )
+				{
+					const size_t prevEnd = groupRanges[ i - 1 ].second;
+					const size_t nextStart = groupRanges[ i  ].first;
+					const size_t gapSize = nextStart - prevEnd;
+					std::string gapStr = fullContent.substr( prevEnd, gapSize );
+					// Skip empty lines.
+					if( gapStr.empty() || (gapStr.find_first_not_of( "\n\r \t" ) == std::string::npos) )
+						continue;
+					vcxprojFooter.append( gapStr );
+				}
+				vcxprojFooter.append( fullContent.substr( groupRanges[ i - 1 ].second ) );
+			}
+			else
+			{
+				// If groups still empty, probably malformed, attempt to save face.
+				vcxprojHeader = fullContent;
+				vcxprojFooter = "\n</Project>";
+			}
+		}
+
+	}
 	// Generate .vcxproj
 	{
 		std::ofstream vcxproj(outputVcxprojPath);
@@ -195,19 +273,17 @@ int main(int argc, char** argv){
 			return 1;
 		}
 
-		vcxproj << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
-		vcxproj << "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\n";
-		vcxproj << "\n";
-		vcxproj << header << "\n";
+		vcxproj << vcxprojHeader;
 
 		if(!includeFilePaths.empty()){
 			vcxproj << "<ItemGroup>\n";
 			for(const fs::path& path : includeFilePaths){
 				vcxproj << "\t<ClInclude Include=\"" << path.string() << "\" />\n";
 			}
-			vcxproj << "</ItemGroup>\n";
-			vcxproj << "\n";
-
+			vcxproj << "</ItemGroup>";
+			if( !compileFilePaths.empty() ){
+				vcxproj << "\n";
+			}
 		}
 
 		if(!compileFilePaths.empty()){
@@ -215,14 +291,10 @@ int main(int argc, char** argv){
 			for(const fs::path& path : compileFilePaths){
 				vcxproj << "\t<ClCompile Include=\"" << path.string() << "\" />\n";
 			}
-			vcxproj << "</ItemGroup>\n";
-			vcxproj << "\n";
-
+			vcxproj << "</ItemGroup>";
 		}
 
-		vcxproj << footer << "\n";
-		vcxproj << "</Project>\n";
-
+		vcxproj << vcxprojFooter;
 		vcxproj.close();
 	}
 	
